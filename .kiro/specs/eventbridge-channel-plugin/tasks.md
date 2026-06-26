@@ -8,14 +8,14 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
 
 ## Tasks
 
-- [ ] 1. Set up project structure and shared types
-  - [ ] 1.1 Create `extensions/eventbridge/package.json` and `extensions/eventbridge/tsconfig.json`
+- [x] 1. Set up project structure and shared types
+  - [x] 1.1 Create `extensions/eventbridge/package.json` and `extensions/eventbridge/tsconfig.json`
     - Add `package.json` with dependencies: `@aws-sdk/client-sqs`, `@aws-sdk/client-eventbridge`, `@aws-sdk/credential-provider-node`, `zod`
     - Add `fast-check` as a dev dependency
     - Use the same `tsconfig.json` pattern as `extensions/irc/tsconfig.json`
     - _Requirements: 1.1, 5.1_
 
-  - [ ] 1.2 Create `extensions/eventbridge/src/types.ts` with shared internal types
+  - [x] 1.2 Create `extensions/eventbridge/src/types.ts` with shared internal types
     - Define `ResolvedEventBridgeConfig`, `EventBridgeRuntimeSnapshot`, `PollResult`, `InboundEventContext`
     - Export shared type aliases used across modules
     - _Requirements: 6.1, 6.2_
