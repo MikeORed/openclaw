@@ -20,83 +20,83 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
     - Export shared type aliases used across modules
     - _Requirements: 6.1, 6.2_
 
-- [ ] 2. Implement configuration and validation
-  - [ ] 2.1 Implement `extensions/eventbridge/src/config-schema.ts`
+- [x] 2. Implement configuration and validation
+  - [x] 2.1 Implement `extensions/eventbridge/src/config-schema.ts`
     - Define `EventBridgeConfigSchema` with zod: `queueUrl` (required), optional `busName`, `busArn`, `sourceNamespace`, `region`, `pollIntervalMs`, `maxMessages`, `waitTimeSeconds`, `dmPolicy`, `allowFrom`
     - Use `DmPolicySchema`, `buildChannelConfigSchema`, `requireOpenAllowFrom` from plugin SDK
     - Apply `.strict()` and `.superRefine()` for cross-field validation
     - _Requirements: 6.1, 6.2, 6.3, 8.1, 8.2_
 
-  - [ ]* 2.2 Write property test for config schema validation
+  - [ ]\* 2.2 Write property test for config schema validation
     - **Property 6: Config schema accepts valid optional field combinations**
     - Generate random valid `queueUrl` + arbitrary subsets of optional fields within constraints
     - Assert `EventBridgeConfigSchema.safeParse` succeeds for all valid combinations
     - **Validates: Requirements 6.2**
 
-  - [ ]* 2.3 Write unit tests for `config-schema.ts`
+  - [x] 2.3 Write unit tests for `config-schema.ts`
     - Test required field rejection (missing `queueUrl`)
     - Test `dmPolicy` / `allowFrom` cross-validation (`open` requires `*` in `allowFrom`)
     - Test boundary values for `maxMessages` (1–10), `waitTimeSeconds` (0–20), `pollIntervalMs` (0–60000)
     - _Requirements: 6.3, 6.4_
 
-- [ ] 3. Implement Signal Envelope schema
-  - [ ] 3.1 Implement `extensions/eventbridge/src/envelope.ts`
+- [x] 3. Implement Signal Envelope schema
+  - [x] 3.1 Implement `extensions/eventbridge/src/envelope.ts`
     - Define `SignalEnvelopeSchema` with zod: `source`, `detailType`, `correlationId`, `causationId`, `payload`, `metadata`
     - Implement `wrapOutboundEnvelope` (returns validated envelope or null)
     - Implement `parseInboundEnvelope` (returns `{ ok, envelope }` or `{ ok, error }`)
     - _Requirements: 4.1, 4.3_
 
-  - [ ]* 3.2 Write property test for inbound envelope round-trip
+  - [ ]\* 3.2 Write property test for inbound envelope round-trip
     - **Property 2: Inbound envelope parsing extracts valid Signal Envelope**
     - Generate random valid `SignalEnvelope` objects, wrap in EventBridge-to-SQS body structure
     - Assert `parseInboundEnvelope(body.detail)` returns `{ ok: true }` with structurally equivalent envelope
     - **Validates: Requirements 2.3, 4.3**
 
-  - [ ]* 3.3 Write property test for invalid envelope rejection
+  - [ ]\* 3.3 Write property test for invalid envelope rejection
     - **Property 3: Invalid envelope rejection**
     - Generate arbitrary objects missing required fields, wrong types, or malformed structure
     - Assert `parseInboundEnvelope` returns `{ ok: false, error }` with non-empty error string
     - **Validates: Requirements 4.2**
 
-  - [ ]* 3.4 Write unit tests for `envelope.ts`
+  - [x] 3.4 Write unit tests for `envelope.ts`
     - Test `wrapOutboundEnvelope` returns null for invalid params
     - Test `parseInboundEnvelope` with edge cases: empty object, null, missing `correlationId`
     - _Requirements: 4.1, 4.2, 4.3_
 
-- [ ] 4. Implement backoff and credentials helpers
-  - [ ] 4.1 Implement `extensions/eventbridge/src/backoff.ts`
+- [x] 4. Implement backoff and credentials helpers
+  - [x] 4.1 Implement `extensions/eventbridge/src/backoff.ts`
     - `createExponentialBackoff` with configurable `baseMs` (default 1000), `maxMs` (default 30000), `jitterFraction` (default 0.2)
     - Returns `{ next(), reset() }` interface
     - _Requirements: 7.4, 10.1_
 
-  - [ ]* 4.2 Write property test for exponential backoff growth
+  - [ ]\* 4.2 Write property test for exponential backoff growth
     - **Property 7: Exponential backoff growth**
     - Generate random retry sequences (N ≥ 2), assert monotonic growth up to max
     - Assert each delay bounded by `min(baseMs * 2^(N-1), maxMs) ± jitter`
     - **Validates: Requirements 7.4, 10.1**
 
-  - [ ] 4.3 Implement `extensions/eventbridge/src/credentials.ts`
+  - [x] 4.3 Implement `extensions/eventbridge/src/credentials.ts`
     - `buildAwsCredentials` using `fromNodeProviderChain`
     - Region resolution: explicit config → `AWS_REGION` → `AWS_DEFAULT_REGION` → `"us-east-1"`
     - _Requirements: 5.1, 5.2, 5.3_
 
-  - [ ]* 4.4 Write property test for region resolution priority
+  - [ ]\* 4.4 Write property test for region resolution priority
     - **Property 5: Region resolution priority**
     - Generate random combinations of explicit region, `AWS_REGION`, `AWS_DEFAULT_REGION` (present/absent)
     - Assert priority order: explicit > `AWS_REGION` > `AWS_DEFAULT_REGION` > `"us-east-1"`
     - **Validates: Requirements 5.3**
 
-  - [ ]* 4.5 Write unit tests for `backoff.ts` and `credentials.ts`
+  - [x] 4.5 Write unit tests for `backoff.ts` and `credentials.ts`
     - Test backoff reset returns to initial delay
     - Test credentials with no env/config uses `us-east-1` fallback
     - Test credentials stores no secrets in returned config
     - _Requirements: 5.3, 5.4, 7.4_
 
-- [ ] 5. Checkpoint - Ensure all tests pass
+- [x] 5. Checkpoint - Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Implement SQS poller
-  - [ ] 6.1 Implement `extensions/eventbridge/src/poller.ts`
+- [x] 6. Implement SQS poller
+  - [x] 6.1 Implement `extensions/eventbridge/src/poller.ts`
     - `runSqsPoller` with long-poll loop respecting `abortSignal`
     - Uses `ReceiveMessageCommand` with configured `MaxNumberOfMessages` and `WaitTimeSeconds`
     - Calls `callbacks.onMessages` for received messages, `callbacks.onError` on failures
@@ -104,13 +104,13 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
     - `deleteMessage` helper for post-processing cleanup
     - _Requirements: 2.1, 2.2, 2.5, 2.6, 10.1, 10.4_
 
-  - [ ]* 6.2 Write property test for poller config fidelity
+  - [ ]\* 6.2 Write property test for poller config fidelity
     - **Property 1: Poller config fidelity**
     - Generate random valid `maxMessages` (1–10) and `waitTimeSeconds` (0–20)
     - Mock SQS client, assert `ReceiveMessageCommand` input contains exactly those values
     - **Validates: Requirements 2.1, 2.6**
 
-  - [ ]* 6.3 Write unit tests for `poller.ts`
+  - [x] 6.3 Write unit tests for `poller.ts`
     - Test abort signal stops the poll loop cleanly
     - Test backoff is called on SQS errors
     - Test `deleteMessage` calls `DeleteMessageCommand` with correct receipt handle
@@ -118,20 +118,20 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
     - _Requirements: 2.2, 2.5, 2.7, 7.2_
 
 - [ ] 7. Implement inbound processing and ingress
-  - [ ] 7.1 Implement `extensions/eventbridge/src/inbound.ts`
+  - [x] 7.1 Implement `extensions/eventbridge/src/inbound.ts`
     - `handleInboundBatch`: parse SQS body → extract `detail` → validate as SignalEnvelope → resolve ingress → deliver or drop
     - Define `eventbridgeIngressIdentity` using `defineStableChannelIngressIdentity` with `source` as sender key
     - Use `createChannelIngressResolver` for access control decisions
     - Delete messages after processing (success or invalid/unauthorized)
     - _Requirements: 2.3, 2.4, 2.5, 4.2, 4.3, 8.3, 8.4_
 
-  - [ ]* 7.2 Write property test for unauthorized event filtering
+  - [ ]\* 7.2 Write property test for unauthorized event filtering
     - **Property 8: Unauthorized event filtering**
     - Generate random `source` values not in configured `allowFrom` list (with `dmPolicy: "allowlist"`)
     - Assert ingress resolver denies and plugin does not deliver to agent
     - **Validates: Requirements 8.4**
 
-  - [ ]* 7.3 Write unit tests for `inbound.ts`
+  - [x] 7.3 Write unit tests for `inbound.ts`
     - Test valid envelope is delivered to agent after ingress approval
     - Test invalid JSON body is logged and deleted (not requeued)
     - Test valid JSON but invalid schema is logged and deleted
@@ -139,8 +139,8 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
     - Test `statusSink` updated on successful inbound delivery
     - _Requirements: 2.3, 2.4, 2.5, 2.7, 4.2, 8.4_
 
-- [ ] 8. Implement outbound adapter
-  - [ ] 8.1 Implement `extensions/eventbridge/src/outbound.ts`
+- [x] 8. Implement outbound adapter
+  - [x] 8.1 Implement `extensions/eventbridge/src/outbound.ts`
     - `sendEventBridgeOutbound` wrapping payload in Signal Envelope and calling `PutEventsCommand`
     - Implement `sendText` and `sendMedia` per `ChannelOutboundAdapter` contract
     - `sendMedia` references media by URL in payload (no inline binary)
@@ -148,13 +148,13 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
     - Reject message if envelope wrapping fails (do not send unwrapped)
     - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 10.2, 10.3_
 
-  - [ ]* 8.2 Write property test for outbound envelope correctness
+  - [ ]\* 8.2 Write property test for outbound envelope correctness
     - **Property 4: Outbound envelope correctness**
     - Generate random valid `sourceNamespace`, `detailType`, `correlationId` UUID, optional `causationId`, message text (and text + mediaUrl)
     - Assert `PutEvents` entry has correct `Source`, `DetailType`, and `Detail` containing all envelope fields
     - **Validates: Requirements 3.1, 3.2, 3.3, 3.4, 3.6**
 
-  - [ ]* 8.3 Write unit tests for `outbound.ts`
+  - [x] 8.3 Write unit tests for `outbound.ts`
     - Test partial failure triggers single retry
     - Test full failure logs with event context (no retry)
     - Test `sendMedia` includes URL reference, not binary
@@ -165,17 +165,17 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 10. Implement probe and gateway lifecycle
-  - [ ] 10.1 Implement `extensions/eventbridge/src/probe.ts`
+  - [x] 10.1 Implement `extensions/eventbridge/src/probe.ts`
     - `probeEventBridge` sends a lightweight `ReceiveMessage` (waitTimeSeconds=0, maxMessages=1) to verify SQS accessibility
     - Returns `{ ok, queueUrl, error?, latencyMs? }`
     - _Requirements: 11.1, 11.2_
 
-  - [ ]* 10.2 Write unit tests for `probe.ts`
+  - [ ] 10.2 Write unit tests for `probe.ts`
     - Test successful probe returns `ok: true` with latency
     - Test failed probe returns `ok: false` with error message
     - _Requirements: 11.2, 11.3_
 
-  - [ ] 10.3 Implement `extensions/eventbridge/src/gateway.ts`
+  - [x] 10.3 Implement `extensions/eventbridge/src/gateway.ts`
     - `startEventBridgeGatewayAccount` orchestrates lifecycle:
       - Validates config, builds AWS clients (SQS + EventBridge)
       - Uses `runStoppablePassiveMonitor` to manage poll loop
@@ -183,7 +183,7 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
       - Respects `ctx.abortSignal` for graceful shutdown
     - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5, 9.1, 9.2_
 
-  - [ ]* 10.4 Write unit tests for `gateway.ts`
+  - [ ] 10.4 Write unit tests for `gateway.ts`
     - Test abort signal triggers clean shutdown
     - Test status snapshot reports configured/running state
     - Test invalid config surfaces status issues (not silent failure)
@@ -224,7 +224,7 @@ Implementation proceeds bottom-up: shared types and helpers first, then core mod
     - Verify plugin activates only when `channels.eventbridge` is configured
     - _Requirements: 1.3, 1.4, 2.4, 2.7, 3.5, 7.1, 7.3, 9.1, 9.2, 9.3, 11.1, 11.4_
 
-  - [ ]* 12.2 Write integration tests for end-to-end flows
+  - [ ]\* 12.2 Write integration tests for end-to-end flows
     - Test SQS → Plugin → Agent delivery path with mocked SQS client
     - Test Agent → Plugin → EventBridge emission path with mocked EB client
     - Test plugin does not activate without explicit `channels.eventbridge` config
