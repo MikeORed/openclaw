@@ -24,7 +24,7 @@ export type ResolvedEventBridgeConfig = {
   /** SQS long-poll wait time in seconds, 0–20. */
   waitTimeSeconds: number;
   /** DM policy for ingress filtering. */
-  dmPolicy: "open" | "pairing" | "allowlist";
+  dmPolicy: "open" | "pairing" | "allowlist" | "disabled";
   /** Allowed event sources for ingress filtering. */
   allowFrom?: string[];
 };

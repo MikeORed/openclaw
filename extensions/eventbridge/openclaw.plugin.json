@@ -1,0 +1,19 @@
+{
+  "id": "eventbridge",
+  "activation": {
+    "onStartup": false
+  },
+  "channels": ["eventbridge"],
+  "channelEnvVars": {
+    "eventbridge": [
+      "EVENTBRIDGE_QUEUE_URL",
+      "EVENTBRIDGE_BUS_NAME",
+      "AWS_REGION"
+    ]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {}
+  }
+}

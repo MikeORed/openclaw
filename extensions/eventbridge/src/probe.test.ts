@@ -5,11 +5,16 @@ const sendMock = vi.fn();
 
 vi.mock("@aws-sdk/client-sqs", () => {
   return {
-    SQSClient: vi.fn().mockImplementation(() => ({
-      send: sendMock,
-      destroy: destroyMock,
-    })),
-    ReceiveMessageCommand: vi.fn().mockImplementation((input: unknown) => ({ input })),
+    SQSClient: class {
+      send = sendMock;
+      destroy = destroyMock;
+    },
+    ReceiveMessageCommand: class {
+      input: unknown;
+      constructor(input: unknown) {
+        this.input = input;
+      }
+    },
   };
 });
 

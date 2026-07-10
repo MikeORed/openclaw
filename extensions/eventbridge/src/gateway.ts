@@ -1,13 +1,13 @@
 // EventBridge channel plugin gateway lifecycle module.
 // Orchestrates config validation, AWS client construction, and the SQS poll loop.
 
-import { EventBridgeClient } from "@aws-sdk/client-eventbridge";
 import { SQSClient } from "@aws-sdk/client-sqs";
 import { runStoppablePassiveMonitor } from "openclaw/plugin-sdk/extension-shared";
 import type { ChannelAccountSnapshot } from "openclaw/plugin-sdk/status-helpers";
 import { EventBridgeConfigSchema } from "./config-schema.js";
 import { buildAwsCredentials } from "./credentials.js";
 import { handleInboundBatch } from "./inbound.js";
+import { setOutboundStatusSink } from "./outbound-status.js";
 import { runSqsPoller } from "./poller.js";
 import type { InboundEventContext, ResolvedEventBridgeConfig } from "./types.js";
 
@@ -42,7 +42,6 @@ export async function startEventBridgeGatewayAccount(ctx: {
   // Build AWS clients using standard credential chain.
   const { credentials, region } = buildAwsCredentials({ region: config.region });
   const sqsClient = new SQSClient({ credentials, region });
-  const _ebClient = new EventBridgeClient({ credentials, region });
 
   // Mutable snapshot — updated at lifecycle transitions and on activity.
   const snapshot: ChannelAccountSnapshot = {
@@ -61,6 +60,15 @@ export async function startEventBridgeGatewayAccount(ctx: {
       // Mark running before the poller begins.
       snapshot.running = true;
       ctx.setStatus({ ...snapshot });
+
+      // Wire outbound status sink so standalone sendText/sendMedia calls
+      // propagate lastOutboundAt back to the gateway snapshot.
+      setOutboundStatusSink((patch) => {
+        if (patch.lastOutboundAt != null) {
+          snapshot.lastOutboundAt = patch.lastOutboundAt;
+          ctx.setStatus({ ...snapshot });
+        }
+      });
 
       const pollerAbort = new AbortController();
 
@@ -122,6 +130,7 @@ export async function startEventBridgeGatewayAccount(ctx: {
 
       return {
         stop: () => {
+          setOutboundStatusSink(null);
           pollerAbort.abort();
         },
       };
