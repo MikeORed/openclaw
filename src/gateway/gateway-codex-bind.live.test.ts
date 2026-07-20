@@ -6,14 +6,14 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { renderCatFacePngBase64 } from "../../test/helpers/live-image-probe.js";
 import { isLiveTestEnabled } from "../agents/live-test-helpers.js";
-import type { ChannelOutboundContext } from "../channels/plugins/types.public.js";
+import type { ChannelOutboundContext } from "../channels/plugins/types.adapters.js";
 import { clearConfigCache, clearRuntimeConfigSnapshot } from "../config/config.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import { getSessionBindingService } from "../infra/outbound/session-binding-service.js";
-import { resolveBundledPluginWorkspaceSourcePath } from "../plugins/bundled-plugin-metadata.js";
+import { findBundledPluginMetadataById } from "../plugins/bundled-plugin-metadata.js";
 import { pluginCommands } from "../plugins/command-registry-state.js";
-import { clearPluginLoaderCache } from "../plugins/loader.js";
+import { clearPluginLoaderCache } from "../plugins/loader.test-fixtures.js";
 import {
   pinActivePluginChannelRegistry,
   releasePinnedPluginChannelRegistry,
@@ -42,7 +42,7 @@ const CODEX_BIND_REQUEST_TIMEOUT_MS = resolveLiveTimeoutMs(
   process.env.OPENCLAW_LIVE_CODEX_BIND_REQUEST_TIMEOUT_MS,
   300_000,
 );
-const DEFAULT_CODEX_BIND_MODEL = "gpt-5.5";
+const DEFAULT_CODEX_BIND_MODEL = "gpt-5.6-luna";
 
 type CapturedOutboundReply = {
   accountId?: string;
@@ -278,14 +278,15 @@ function resolveCodexPluginRoot(): string {
   if (command?.pluginRoot) {
     return command.pluginRoot;
   }
-  const pluginRoot = resolveBundledPluginWorkspaceSourcePath({
+  const metadata = findBundledPluginMetadataById("codex", {
     rootDir: process.cwd(),
-    pluginId: "codex",
+    includeChannelConfigs: false,
+    includeSyntheticChannelConfigs: false,
   });
-  if (!pluginRoot) {
+  if (!metadata) {
     throw new Error("Codex bundled plugin root was not found");
   }
-  return pluginRoot;
+  return path.resolve(process.cwd(), "extensions", metadata.dirName);
 }
 
 function resolveBoundSessionKey(params: {

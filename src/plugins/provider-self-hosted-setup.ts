@@ -1,5 +1,3 @@
-// Builds setup metadata for self-hosted provider plugins.
-import { readResponseWithLimit } from "@openclaw/media-core/read-response-with-limit";
 import {
   findNormalizedProviderValue,
   normalizeProviderId,
@@ -19,6 +17,8 @@ import {
 } from "../agents/self-hosted-provider-defaults.js";
 import type { ModelDefinitionConfig } from "../config/types.models.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+// Builds setup metadata for self-hosted provider plugins.
+import { readResponseWithLimit } from "../infra/http-body.js";
 import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
 import type { SsrFPolicy } from "../infra/net/ssrf.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
@@ -26,7 +26,7 @@ import { normalizeOptionalSecretInput } from "../utils/normalize-secret-input.js
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { applyAuthProfileConfig } from "./provider-auth-helpers.js";
 import type {
-  ProviderDiscoveryContext,
+  ProviderCatalogContext,
   ProviderAuthResult,
   ProviderAuthMethodNonInteractiveContext,
   ProviderNonInteractiveApiKeyResult,
@@ -105,7 +105,11 @@ async function readSelfHostedDiscoveryJson(response: Response, label: string): P
         `${label} discovery response body too large: ${size} bytes (limit: ${maxBytes} bytes)`,
       ),
   });
-  return JSON.parse(new TextDecoder().decode(bytes));
+  try {
+    return JSON.parse(new TextDecoder().decode(bytes)) as unknown;
+  } catch (cause) {
+    throw new Error(`${label} discovery response is not valid JSON`, { cause });
+  }
 }
 
 async function cancelUnreadResponseBody(response: Response): Promise<void> {
@@ -436,7 +440,7 @@ export async function promptAndConfigureOpenAICompatibleSelfHostedProviderAuth(
 export async function discoverOpenAICompatibleSelfHostedProvider<
   T extends Record<string, unknown>,
 >(params: {
-  ctx: ProviderDiscoveryContext;
+  ctx: ProviderCatalogContext;
   providerId: string;
   buildProvider: (params: { apiKey?: string; baseUrl?: string }) => Promise<T>;
 }): Promise<{ provider: T & { apiKey: string } } | null> {

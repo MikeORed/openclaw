@@ -8,12 +8,13 @@ import os from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTempDirTracker } from "../../test/helpers/temp-dir.js";
-import type { ProcessSupervisor, SpawnInput } from "../process/supervisor/index.js";
+import type { ProcessSupervisor } from "../process/supervisor/index.js";
+import type { SpawnInput } from "../process/supervisor/types.js";
 import { captureEnv } from "../test-utils/env.js";
-import { resetProcessRegistryForTests } from "./bash-process-registry.js";
+import { resetProcessRegistryForTests } from "./bash-process-registry.test-support.js";
 import { createExecTool } from "./bash-tools.exec.js";
 import type { BashSandboxConfig } from "./bash-tools.shared.js";
-import { resolveShellFromPath } from "./shell-utils.js";
+import { getBashShellConfig } from "./shell-utils.js";
 
 const supervisorMock = vi.hoisted(() => ({
   spawn: vi.fn<ProcessSupervisor["spawn"]>(),
@@ -29,7 +30,7 @@ vi.mock("../process/supervisor/index.js", () => ({
 const isWin = process.platform === "win32";
 const defaultShell = isWin
   ? undefined
-  : process.env.OPENCLAW_TEST_SHELL || resolveShellFromPath("bash") || process.env.SHELL || "sh";
+  : process.env.OPENCLAW_TEST_SHELL || getBashShellConfig().shell;
 const tempDirs = createTempDirTracker();
 
 function requireTextContent(
@@ -136,6 +137,26 @@ describe("exec foreground failures", () => {
     tempDirs.cleanup();
   });
 
+  it("keeps the background fallback warning when gateway exec actually runs inline", async () => {
+    mockSuccessfulSpawn();
+    const tool = createExecTool({
+      host: "gateway",
+      security: "full",
+      ask: "off",
+      allowBackground: false,
+    });
+
+    const result = await tool.execute("call-background-disabled-foreground", {
+      command: "echo ok",
+      background: true,
+    });
+
+    expect(result.details.status).toBe("completed");
+    expect(requireTextContent(result)).toContain(
+      "Warning: background execution is disabled; running synchronously.",
+    );
+  });
+
   it("returns a failed text result when the default timeout is exceeded", async () => {
     const tool = createExecTool({
       security: "full",
@@ -156,7 +177,7 @@ describe("exec foreground failures", () => {
       wait: vi.fn(async () => ({
         reason: "overall-timeout" as const,
         exitCode: null,
-        exitSignal: null,
+        exitSignal: "SIGKILL" as NodeJS.Signals,
         durationMs: input.timeoutMs ?? 50,
         stdout: "",
         stderr: "",
@@ -175,10 +196,17 @@ describe("exec foreground failures", () => {
     expect(supervisorMock.spawn.mock.calls[0]?.[0]?.timeoutMs).toBe(1_000);
     const text = requireTextContent(result);
     expect(text).toMatch(/timed out/i);
-    expect(text).toMatch(/re-run with a higher timeout/i);
+    expect(text).toContain("external side effects may already have completed");
+    expect(text).toContain("Verify the resulting state before retrying");
+    expect(text).toContain("Do not automatically rerun non-idempotent commands");
+    expect(text).toContain("known to be safe to retry");
     const details = requireFailedDetails(result.details);
     expect(details.exitCode).toBeNull();
+    expect(details.exitSignal).toBe("SIGKILL");
+    expect(details.failureKind).toBe("overall-timeout");
+    expect(details.exitReason).toBe("overall-timeout");
     expect(details.timedOut).toBe(true);
+    expect(details.noOutputTimedOut).toBe(false);
     expect(details.aggregated).toBe("");
     expect(details.durationMs).toBeTypeOf("number");
     expect(details.durationMs).toBeGreaterThanOrEqual(0);
@@ -362,6 +390,62 @@ describe("exec foreground failures", () => {
       expect(buildExecSpec.mock.calls[0]?.[0]?.workdir).toBe("/remote/workspace/generated");
       expect(supervisorMock.spawn).toHaveBeenCalledOnce();
       expect(supervisorMock.spawn.mock.calls[0]?.[0]?.cwd).toBe(workspaceDir);
+    } finally {
+      fs.rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it("finalizes backend sandbox exec tokens when process spawn fails", async () => {
+    const workspaceDir = tempDirs.make("openclaw-sandbox-workdir-");
+    const finalizeToken = { session: "remote-session" };
+    const buildExecSpec = vi.fn<NonNullable<BashSandboxConfig["buildExecSpec"]>>(
+      async (params) => ({
+        argv: ["remote-shell", params.command],
+        env: {},
+        stdinMode: "pipe-open" as const,
+        finalizeToken,
+      }),
+    );
+    const finalizeExec = vi.fn<NonNullable<BashSandboxConfig["finalizeExec"]>>(async () => {});
+    const validateWorkdir = vi.fn<NonNullable<BashSandboxConfig["validateWorkdir"]>>(
+      async (workdir) => workdir,
+    );
+    supervisorMock.spawn.mockRejectedValueOnce(new Error("spawn failed"));
+
+    const tool = createExecTool({
+      host: "sandbox",
+      security: "full",
+      ask: "off",
+      allowBackground: false,
+      sandbox: {
+        containerName: "remote-sandbox-workdir-test",
+        workspaceDir,
+        containerWorkdir: "/remote/workspace",
+        workdirValidation: "backend",
+        validateWorkdir,
+        buildExecSpec,
+        finalizeExec,
+      },
+    });
+
+    try {
+      await expect(
+        tool.execute("call-remote-sandbox-spawn-failure", {
+          command: "echo ok",
+          workdir: "/remote/workspace/generated",
+        }),
+      ).rejects.toThrow("spawn failed");
+
+      expect(validateWorkdir).toHaveBeenCalledWith("/remote/workspace/generated");
+      expect(buildExecSpec).toHaveBeenCalledOnce();
+      expect(supervisorMock.spawn).toHaveBeenCalledOnce();
+      expect(finalizeExec).toHaveBeenCalledOnce();
+      expect(finalizeExec).toHaveBeenCalledWith({
+        status: "failed",
+        exitCode: null,
+        timedOut: false,
+        token: finalizeToken,
+      });
     } finally {
       fs.rmSync(workspaceDir, { recursive: true, force: true });
     }
